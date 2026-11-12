@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Study Drawer</title>
+<meta name="description" content="The Study Drawer turns your notes or a photo of a page into a summary, story, flashcards and a quiz, with a Coach that never does your work for you.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a navy header band with two tabs (Study Drawer, Coach) over a ruled-paper page; the Drawer is paper and ink, the Coach is a dark panel. */
+:root{
+  --bg:#ECE8DA; --rule:rgba(27,42,59,.06); --card:#FBF9F2; --ink:#1B2A3B; --ink-2:#4B5B6C; --line:#1B2A3B; --soft:#DDD8C6;
+  --navy:#1B2A3B; --navy-ink:#F3F0E4; --navy-2:#9FB0C2; --lime:#E3D5B5; --rust:#BE4128; --rust-ink:#FFFFFF; --ok:#2F7D4F; --bad:#B3341F;
+  --shadow:rgba(27,42,59,.9);
+  --c-bg:#0B1118; --c-card:#131B26; --c-line:#263445; --c-ink:#E8EAF0; --c-mute:#8A97A8; --c-accent:#5578E0; --c-field:#0E151E;
+  --f-ui:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-display:"Fraunces",Georgia,"Times New Roman",serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E141C; --rule:rgba(233,230,218,.045); --card:#151E29; --ink:#E9E6DA; --ink-2:#A3B0BE; --line:#3A4A5C; --soft:#233140;
+  --navy:#0A0F15; --navy-ink:#EDEADF; --navy-2:#8FA0B3; --rust:#D9573D; --ok:#5FBF86; --bad:#F08A76; --shadow:rgba(0,0,0,.7); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E141C; --rule:rgba(233,230,218,.045); --card:#151E29; --ink:#E9E6DA; --ink-2:#A3B0BE; --line:#3A4A5C; --soft:#233140;
+  --navy:#0A0F15; --navy-ink:#EDEADF; --navy-2:#8FA0B3; --rust:#D9573D; --ok:#5FBF86; --bad:#F08A76; --shadow:rgba(0,0,0,.7); color-scheme:dark}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--f-ui);
+  background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 31px,var(--rule) 31px,var(--rule) 32px);
+  padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--c-accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.09em;font-size:11.5px}
+[hidden]{display:none!important}
+
+/* header band */
+.top{background:var(--navy);color:var(--navy-ink);padding-block:18px 0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top-in{max-width:780px;margin:0 auto}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{font:700 26px/1.1 var(--f-ui);letter-spacing:-.02em;margin:0}
+.brand .mono{color:var(--navy-2);border:1px solid rgba(243,240,228,.25);padding:3px 8px;border-radius:4px}
+.tabs{display:flex;gap:4px;margin-top:16px}
+.tab{background:transparent;border:0;color:var(--navy-2);padding:11px 18px;border-radius:10px 10px 0 0;font-weight:600;letter-spacing:.01em}
+.tab[aria-selected="true"]{background:var(--bg);color:var(--ink)}
+body.on-coach .tab[aria-selected="true"]{background:var(--c-bg);color:var(--c-ink)}
+body.on-coach{background:var(--c-bg);background-image:none}
+
+.wrap{max-width:780px;margin:0 auto;padding-block:26px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* stats */
+.stats{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.stat{background:var(--card);border:2px solid var(--line);border-radius:8px;padding:8px 16px;box-shadow:3px 3px 0 var(--shadow);min-width:84px;text-align:center}
+.stat .mono{display:block;color:var(--ink-2);font-size:11px}
+.stat b{font:600 28px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.initials{width:56px;height:56px;border-radius:50%;background:var(--navy);color:var(--navy-ink);border:0;text-align:center;font:600 18px var(--f-ui);letter-spacing:.04em;text-transform:uppercase}
+.rule{height:3px;background:var(--ink);margin:22px 0 20px;border:0}
+
+.label{color:var(--ink-2);margin:0 0 12px}
+.empty{color:var(--ink-2);margin:0 0 4px}
+
+/* deck list */
+.decks{display:grid;gap:10px;margin:0}
+.deck{display:grid;grid-template-columns:1fr auto;gap:4px 14px;text-align:left;background:var(--card);border:2px solid var(--line);border-radius:10px;padding:14px 16px;width:100%;box-shadow:3px 3px 0 var(--shadow);transition:transform .12s}
+.deck:hover{transform:translate(-1px,-1px)}
+.deck h3{margin:0;font:600 19px/1.25 var(--f-display)}
+.deck .meta{color:var(--ink-2)}
+.deck .go{align-self:center;grid-row:1/3;grid-column:2;font:500 12px var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--rust)}
+
+/* level */
+.level{background:var(--navy);color:var(--navy-ink);border-radius:10px;padding:20px 22px;margin:26px 0}
+.level h2{margin:0 0 4px;font:600 26px/1.15 var(--f-display)}
+.level .mono{color:var(--navy-2);text-transform:none;letter-spacing:.02em;font-size:13px}
+.bar{height:9px;border-radius:5px;background:rgba(243,240,228,.16);margin-top:16px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--lime);border-radius:5px;transition:width .5s}
+
+/* entry card */
+.entry{background:var(--card);border:2px solid var(--line);border-radius:12px;padding:20px}
+.entry-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.seg{display:inline-flex;border:2px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:9px 16px;font:500 12px var(--f-mono);text-transform:uppercase;letter-spacing:.09em}
+.seg button[aria-pressed="true"]{background:var(--navy);color:var(--navy-ink)}
+.field{width:100%;background:transparent;border:0;border-bottom:2px solid var(--line);padding:10px 2px;font:600 20px var(--f-ui);margin-bottom:16px;border-radius:0}
+.field::placeholder,.paste::placeholder{color:var(--ink-2);opacity:.65}
+.paste{width:100%;min-height:200px;resize:vertical;background:transparent;border:1.5px dashed var(--ink-2);border-radius:6px;padding:14px;font:14px/1.6 var(--f-mono)}
+.drop{border:1.5px dashed var(--ink-2);border-radius:6px;padding:18px;display:grid;gap:14px}
+.drop p{margin:0;color:var(--ink-2)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.thumbs{display:flex;gap:10px;flex-wrap:wrap}
+.thumb{position:relative;width:86px;height:86px;border:2px solid var(--line);border-radius:6px;overflow:hidden;background:var(--soft)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;border:0;background:var(--navy);color:var(--navy-ink);font-size:13px;line-height:1;padding:0}
+.btn{border:2px solid var(--line);background:var(--card);color:var(--ink);padding:10px 16px;border-radius:8px;font-weight:600;box-shadow:2px 2px 0 var(--shadow);transition:transform .1s}
+.btn:active{transform:translate(2px,2px);box-shadow:none}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.quiet{box-shadow:none;border-color:var(--soft);color:var(--ink-2);font-weight:500}
+.btn.primary{background:var(--rust);border-color:var(--rust);color:var(--rust-ink);box-shadow:3px 3px 0 var(--shadow);padding:13px 22px;font-size:16px}
+.note{color:var(--ink-2);font:12.5px var(--f-mono);margin:16px 0 12px}
+.err{border:2px solid var(--bad);color:var(--bad);border-radius:8px;padding:10px 14px;margin-top:14px;background:transparent;font-weight:500}
+
+/* deck view */
+.deck-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.deck-title{font:600 clamp(26px,5vw,36px)/1.15 var(--f-display);margin:16px 0 4px;text-wrap:balance}
+.sections{display:flex;gap:6px;overflow-x:auto;margin:20px 0 0;padding-bottom:2px;border-bottom:3px solid var(--ink);scrollbar-width:none}
+.sections::-webkit-scrollbar{display:none}
+.sec{flex:none;background:transparent;border:2px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;padding:10px 14px;font:500 12px var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-2)}
+.sec[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.panel{background:var(--card);border:2px solid var(--line);border-top:0;border-radius:0 0 12px 12px;padding:22px 20px;min-height:260px}
+.panel h3{font:600 22px/1.25 var(--f-display);margin:0 0 10px}
+.panel p{margin:0 0 14px;max-width:66ch}
+.lede{font:500 19px/1.55 var(--f-display);max-width:60ch}
+.points{margin:16px 0;padding:0;list-style:none;display:grid;gap:10px}
+.points li{display:grid;grid-template-columns:auto 1fr;gap:12px;max-width:66ch}
+.points li::before{content:"";width:8px;height:8px;margin-top:9px;background:var(--rust)}
+.callout{background:var(--navy);color:var(--navy-ink);border-radius:8px;padding:16px 18px;margin-top:18px}
+.callout .mono{color:var(--lime);display:block;margin-bottom:6px}
+.callout p{margin:0}
+.regen{margin-top:20px}
+.loading{display:grid;gap:12px;justify-items:start;padding:20px 0}
+.loading .bar{width:100%;background:var(--soft)}
+.loading .bar i{width:35%;background:var(--rust);animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+.story p{font:400 17px/1.75 var(--f-display);max-width:60ch}
+.decoder{margin-top:22px;border-top:2px solid var(--ink);padding-top:14px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;padding:10px 0;border-bottom:1px solid var(--soft)}
+.pair span:first-child{font-weight:600}
+@media (max-width:520px){.pair{grid-template-columns:1fr}}
+
+/* flashcards */
+.fc-count{color:var(--ink-2);margin-bottom:12px}
+.fc{perspective:1200px;margin-bottom:16px}
+.fc-face{min-height:230px;border:2px solid var(--line);border-radius:12px;display:grid;place-items:center;padding:28px 22px;text-align:center;width:100%;background:var(--card);box-shadow:4px 4px 0 var(--shadow)}
+.fc-face.back{background:var(--navy);color:var(--navy-ink)}
+.fc-face .mono{display:block;margin-bottom:12px;opacity:.7}
+.fc-face .txt{font:600 clamp(19px,3.4vw,24px)/1.35 var(--f-display);text-wrap:balance}
+.fc-known{margin-top:10px;color:var(--ok)}
+
+/* quiz */
+.q-text{font:600 21px/1.35 var(--f-display);margin:8px 0 16px;max-width:56ch}
+.opts{display:grid;gap:10px}
+.opt{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;text-align:left;border:2px solid var(--line);background:var(--card);border-radius:8px;padding:12px 14px}
+.opt b{font:500 13px var(--f-mono)}
+.opt.right{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,var(--card))}
+.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--card))}
+.why{margin-top:14px;border-left:4px solid var(--ink);padding:4px 0 4px 14px}
+.score{font:600 54px/1 var(--f-display);margin:8px 0}
+
+/* terms, tricks, practice */
+.terms{display:grid;gap:0;margin:0}
+.terms div{display:grid;grid-template-columns:minmax(120px,1fr) 2fr;gap:6px 18px;padding:12px 0;border-bottom:1px solid var(--soft)}
+.terms dt{font-weight:700;margin:0}
+.terms dd{margin:0}
+@media (max-width:520px){.terms div{grid-template-columns:1fr}}
+.trick{padding:14px 0;border-bottom:1px solid var(--soft)}
+.trick .mono{color:var(--rust);display:block;margin-bottom:4px}
+.trick p{margin:0}
+.pq{padding:16px 0;border-bottom:1px solid var(--soft)}
+.pq textarea{width:100%;min-height:90px;margin:10px 0;background:transparent;border:1.5px dashed var(--ink-2);border-radius:6px;padding:10px;font:14px/1.55 var(--f-ui);resize:vertical}
+.model{background:var(--soft);border-radius:6px;padding:12px 14px;margin-top:8px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--navy);color:var(--lime);padding:9px 16px;border-radius:999px;font:500 13px var(--f-mono);z-index:20;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+
+/* coach */
+.coach{color:var(--c-ink)}
+.coach h2{font:700 clamp(28px,6vw,40px)/1.15 var(--f-ui);letter-spacing:-.02em;text-align:center;margin:8px 0 10px;text-wrap:balance}
+.coach .sub{color:var(--c-mute);text-align:center;margin:0 auto 24px;max-width:46ch}
+.chips{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.chip{background:var(--c-card);border:1px solid var(--c-line);color:var(--c-ink);border-radius:999px;padding:10px 20px;font-weight:500}
+.chip[aria-pressed="true"]{border-color:var(--c-accent);background:color-mix(in srgb,var(--c-accent) 22%,var(--c-card))}
+.chip.act{border-radius:12px;padding:9px 16px;font-size:14px}
+.meter{background:var(--c-card);border:1px solid var(--c-line);border-radius:14px;padding:16px 18px;margin:26px 0 18px}
+.meter-top{display:flex;justify-content:space-between;font-weight:500;margin-bottom:10px}
+.meter-top b{font-variant-numeric:tabular-nums}
+.meter .track{height:10px;border-radius:5px;background:var(--c-line);overflow:hidden}
+.meter .track i{display:block;height:100%;width:0;background:var(--lime);border-radius:5px;transition:width .5s}
+.meter p{margin:10px 0 0;color:var(--c-mute);font-size:13px}
+.thread{display:grid;gap:12px;margin-bottom:18px}
+.msg{max-width:92%;padding:12px 16px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.me{justify-self:end;background:color-mix(in srgb,var(--c-accent) 26%,var(--c-card));border:1px solid color-mix(in srgb,var(--c-accent) 45%,var(--c-line))}
+.msg.ai{justify-self:start;background:var(--c-card);border:1px solid var(--c-line)}
+.msg .who{display:block;color:var(--c-mute);font:500 11px var(--f-mono);text-transform:uppercase;letter-spacing:.09em;margin-bottom:4px}
+.composer{background:var(--c-card);border:1px solid var(--c-line);border-radius:14px;padding:16px;display:grid;gap:14px}
+.composer textarea{width:100%;min-height:120px;resize:vertical;background:var(--c-field);border:1px solid var(--c-line);border-radius:12px;padding:14px;color:var(--c-ink);font:16px/1.5 var(--f-ui)}
+.composer textarea::placeholder{color:var(--c-mute)}
+.send{background:var(--c-accent);color:#fff;border:0;border-radius:12px;padding:15px;font-weight:700;letter-spacing:.02em}
+.send[disabled]{opacity:.55}
+.coach .err{margin-top:0}
+.coach .link{background:none;border:0;color:var(--c-mute);text-decoration:underline;padding:0}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ticker, landing, login */
+
+Part 2 of 5. Paste this right after Part 1, starting on the next line.
+
+.ticker{position:sticky;top:0;z-index:30;background:#1B2A3B;color:#E3D5B5;border-bottom:1px solid rgba(227,213,181,.25);overflow:hidden;white-space:nowrap;font:500 12px var(--f-mono);text-transform:uppercase;letter-spacing:.1em;height:34px;display:flex;align-items:center}
+.ticker-track{display:flex;width:max-content;animation:tick 80s linear infinite}
+.ticker:hover .ticker-track{animation-play-state:paused}
+.ticker span{padding:0 22px}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.ticker{overflow-x:auto}}
+.login-btn{position:fixed;z-index:31;top:42px;right:max(12px,env(safe-area-inset-right,0px));padding:6px 12px;font-size:13px;border-radius:999px}
+.landing{position:relative;max-width:780px;margin:0 auto;padding:44px max(16px,env(safe-area-inset-left,0px)) 56px;text-align:center;overflow:hidden}
+.glow{position:absolute;inset:-60px -20px auto -20px;height:560px;z-index:-1;pointer-events:none;
+  background:radial-gradient(60% 50% at 20% 25%,rgba(63,182,201,.22),transparent 70%),radial-gradient(55% 50% at 85% 55%,rgba(77,201,160,.20),transparent 70%)}
+.eyebrow{color:#F3F0E4;background:#1B2A3B;border:2px solid #1B2A3B;display:inline-block;padding:9px 20px;border-radius:999px;margin:0 0 20px;font:600 17px var(--f-display);text-transform:none;letter-spacing:.01em;box-shadow:0 8px 22px rgba(27,42,59,.25)}
+.hero{font:700 clamp(38px,10.5vw,68px)/1.04 var(--f-ui);letter-spacing:-.035em;margin:0 0 16px;text-wrap:balance}
+.grad{position:relative;display:inline-block;background:linear-gradient(90deg,#3FB6C9,#4DC9A0);-webkit-background-clip:text;background-clip:text;color:transparent}
+.squig{position:absolute;left:0;right:0;bottom:-10px;width:100%;height:10px}
+.slogan{font:italic 500 clamp(21px,5vw,27px)/1.45 var(--f-display);max-width:26ch;margin:22px auto 28px;color:var(--ink)}
+.hl{color:inherit}
+.wipe{position:fixed;inset:0;z-index:60;background:#1B2A3B;color:#E3D5B5;display:grid;place-items:center;transform:translateY(100%);pointer-events:none}
+.wipe.in{transition:transform .5s cubic-bezier(.77,0,.18,1);transform:translateY(0);pointer-events:auto}
+.wipe.out{transition:transform .55s cubic-bezier(.77,0,.18,1);transform:translateY(-100%)}
+.wipe-in{text-align:center;opacity:0;transform:translateY(14px);transition:opacity .35s .25s,transform .35s .25s}
+.wipe.in .wipe-in{opacity:1;transform:none}
+.wipe-name{font:600 clamp(30px,8vw,46px)/1.1 var(--f-display)}
+.wipe-sub{margin-top:8px;opacity:.7;font:500 12px var(--f-mono);text-transform:uppercase;letter-spacing:.14em}
+.wipe-bar{width:170px;height:3px;background:rgba(227,213,181,.25);margin:20px auto 0;border-radius:2px;overflow:hidden}
+.wipe-bar i{display:block;height:100%;width:0;background:#E3D5B5}
+.wipe.in .wipe-bar i{width:100%;transition:width .7s .2s ease}
+.app-rise{animation:rise .6s .05s both cubic-bezier(.2,.7,.2,1)}
+@keyframes rise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+.cta-main{transition:transform .2s}
+.cta-main:hover{transform:translateY(-2px)}
+.cta-main:active{transform:scale(.97)}
+.demo{background:color-mix(in srgb,var(--card) 88%,transparent);border:1.5px solid transparent;background-image:linear-gradient(var(--card),var(--card)),linear-gradient(120deg,#3FB6C9,rgba(77,201,160,.25) 60%,var(--soft));background-origin:border-box;background-clip:padding-box,border-box;border-radius:26px;padding:14px;text-align:left;box-shadow:0 18px 50px rgba(27,42,59,.10);max-width:560px;margin:0 auto}
+.demo-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:var(--ink-2);font-size:14px}
+.dot{width:9px;height:9px;border-radius:50%;background:#4DC9A0}
+.mini{margin-left:auto;display:flex}
+.mini .badge{width:22px;height:22px;border-radius:50%;margin-left:-6px;border:2px solid var(--card)}
+.mini .badge svg{width:12px;height:12px}
+.demo-in{display:flex;gap:12px;align-items:center;background:var(--bg);border:1px solid var(--soft);border-radius:18px;padding:14px 14px 14px 16px}
+.demo-in p{margin:0;flex:1;font-size:16px;line-height:1.45;color:var(--ink)}
+.go{flex:none;width:46px;height:46px;border-radius:50%;border:0;background:var(--navy);color:var(--navy-ink);display:grid;place-items:center}
+.go svg{width:22px;height:22px}
+.pills{display:flex;gap:8px;overflow-x:auto;margin-top:12px;padding-bottom:2px;scrollbar-width:none}
+.pills::-webkit-scrollbar{display:none}
+.pill{flex:none;border:1px solid var(--soft);border-radius:999px;padding:8px 16px;font-size:14px;color:var(--ink);background:transparent;transition:background .3s,border-color .3s}
+.pill.on{background:color-mix(in srgb,#3FB6C9 22%,var(--card));border-color:#3FB6C9}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+.cta .btn{box-shadow:none;border-radius:999px;font-size:18px}
+.cta-main{background:var(--navy);color:var(--navy-ink);border-color:var(--navy);display:inline-flex;align-items:center;gap:14px;padding:10px 12px 10px 24px;box-shadow:0 10px 28px rgba(27,42,59,.28)!important}
+.stack{display:flex;background:var(--card);border-radius:999px;padding:4px 6px}
+.stack .badge{width:34px;height:34px;border-radius:50%;margin-left:-8px;border:3px solid var(--card)}
+.stack .badge:first-child{margin-left:0}
+.stack .badge svg{width:17px;height:17px}
+.stack .more{align-self:center;color:var(--navy);font:600 14px var(--f-ui);padding:0 8px 0 6px}
+.cta-ghost{background:transparent;border-color:var(--soft);color:var(--ink);padding:14px 26px}
+.rows{margin:48px -16px 0;display:grid;gap:22px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);overflow:hidden}
+.row-track{display:flex;width:max-content;animation:tick 90s linear infinite}
+.row-track.rev{animation-direction:reverse;animation-duration:105s}
+.row-track.slow{animation-duration:120s}
+.item{display:flex;align-items:center;gap:12px;padding-right:40px;font:600 21px var(--f-ui);white-space:nowrap}
+.badge{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:13px}
+.badge svg{width:24px;height:24px}
+.modal{position:fixed;inset:0;z-index:40;background:rgba(10,15,21,.6);display:grid;place-items:center;padding:16px}
+.modal-card{background:var(--card);border:2px solid var(--line);border-radius:12px;padding:22px;width:100%;max-width:380px;display:grid;gap:12px;box-shadow:4px 4px 0 var(--shadow)}
+.modal-card h2{font:600 24px var(--f-display);margin:0}
+.modal-card p{margin:0;color:var(--ink-2);font-size:13px}
+.modal-card label{display:grid;gap:4px;font-weight:600;font-size:13px}
+.modal-card input{background:transparent;border:2px solid var(--line);border-radius:8px;padding:10px 12px;font:16px var(--f-ui)}
+.brand h1{cursor:pointer}
+</style>
+
+</head>
+<body>
+<div class="ticker" aria-hidden="true"><div class="ticker-track" id="ticker"></div></div>
+<button class="btn login-btn" id="login-btn" type="button">Log in</button>
+<div class="modal" id="login-modal" hidden role="dialog" aria-modal="true" aria-labelledby="lg-title">
+  <form class="modal-card" id="login-form">
+    <h2 id="lg-title">Log in</h2>
+    <p>This saves your name on this device only. There is no password and no server.</p>
+    <label>Your name<input id="lg-name" required maxlength="40" autocomplete="name"></label>
+    <label>Email (optional)<input id="lg-email" type="email" maxlength="80" autocomplete="email"></label>
+    <div class="row"><button class="btn primary" type="submit">Continue</button><button class="btn quiet" type="button" id="lg-cancel">Cancel</button></div>
+  </form>
+</div>
+<div class="wipe" id="wipe" aria-hidden="true"><div class="wipe-in"><div class="wipe-name">The Study Drawer</div><div class="wipe-sub">Opening your drawer</div><div class="wipe-bar"><i></i></div></div></div>
+<section id="landing" class="landing">
+  <div class="glow" aria-hidden="true"></div>
+  <p class="mono eyebrow">Goat Apps &middot; The Study Drawer</p>
+  <h1 class="hero">All your study tools<br><span class="grad">in one drawer<svg class="squig" viewBox="0 0 300 10" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="sq" x1="0" x2="1"><stop offset="0" stop-color="#3FB6C9"/><stop offset="1" stop-color="#4DC9A0"/></linearGradient></defs><path d="M2 6 Q 14 0 26 5 T 50 5 T 74 5 T 98 5 T 122 5 T 146 5 T 170 5 T 194 5 T 218 5 T 242 5 T 266 5 T 298 5" fill="none" stroke="url(#sq)" stroke-width="2.5" stroke-linecap="round"/></svg></span></h1>
+  <p class="slogan"><span class="hl">Drop in your notes. Get flashcards, a quiz and a story back. Start now.</span></p>
+  <div class="demo">
+    <div class="demo-top"><span class="dot"></span><span>Study Drawer</span><span class="mini" id="mini"></span></div>
+    <div class="demo-in">
+      <p>Photosynthesis is the process plants use to make food from sunlight...</p>
+      <button class="go" id="start2" type="button" aria-label="Start now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    </div>
+    <div class="pills" id="pills"></div>
+  </div>
+  <div class="cta">
+    <button class="btn cta-main" id="start" type="button"><span>Start now</span><span class="stack" id="stack"></span></button>
+    <button class="btn cta-ghost" id="see" type="button">See features &#8595;</button>
+  </div>
+  <div class="rows" id="rows" aria-hidden="true"></div>
+</section>
+<div id="app" hidden>
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><h1>The Study Drawer</h1><span class="mono">File. Flip. Learn.</span></div>
+    <div class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" id="tab-drawer" aria-selected="true" data-view="drawer">Study Drawer</button>
+      <button class="tab" role="tab" id="tab-coach" aria-selected="false" data-view="coach">Coach</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- STUDY DRAWER -->
+  <section id="view-drawer" role="tabpanel" aria-labelledby="tab-drawer">
+    <div id="home">
+      <div class="stats">
+        <div class="stat"><span class="mono">Streak</span><b id="st-streak">0</b></div>
+        <div class="stat"><span class="mono">XP</span><b id="st-xp">0</b></div>
+        <input class="initials" id="initials" maxlength="2" value="AM" aria-label="Your initials">
+      </div>
+      <hr class="rule">
+      <p class="label mono">Drawer / Your decks</p>
+      <div id="decks" class="decks"></div>
+
+      <div class="level" aria-live="polite">
+        <h2 id="lv-title">Level 1 Newcomer</h2>
+        <span class="mono" id="lv-sub">250 XP to Level 2</span>
+        <div class="bar"><i id="lv-bar" style="width:0"></i></div>
+      </div>
+
+      <div class="entry">
+        <div class="entry-head">
+          <span class="label mono" style="margin:0">New entry</span>
+          <div class="seg" role="group" aria-label="Input method">
+            <button id="m-type" aria-pressed="true">Type it</button>
+            <button id="m-photo" aria-pressed="false">Scan a photo</button>
+          </div>
+        </div>
+        <input class="field" id="title-in" placeholder="Title this deck (optional)" maxlength="80" autocomplete="off">
+        <div id="p-type"><textarea class="paste" id="text-in" placeholder="Paste your chapter, lecture notes, or anything you need to learn..."></textarea></div>
+        <div id="p-photo" class="drop" hidden>
+          <p>Photograph each page of your chapter or notes. Clear light and flat pages give the best result.</p>
+          <div class="row">
+            <button class="btn" id="b-cam" type="button">Take a photo</button>
+            <button class="btn" id="b-file" type="button">Choose from files</button>
+          </div>
+          <input type="file" id="f-cam" accept="image/*" capture="environment" hidden>
+          <input type="file" id="f-file" accept="image/*" multiple hidden>
+          <div class="thumbs" id="thumbs"></div>
+          <p id="photo-note" class="mono" style="font-size:11.5px"></p>
+        </div>
+        <p class="note">Builds a summary, a story, flashcards, a quiz and more. It runs in your browser, so it works without an account. Takes a moment.</p>
+        <div class="row">
+          <button class="btn primary" id="stamp">Stamp &amp; Generate</button>
+          
+        </div>
+        <div id="stamp-status" class="note" hidden></div>
+        <div id="stamp-err" class="err" role="alert" hidden></div>
+      </div>
+    </div>
+
+    <div id="deckview" hidden></div>
+  </section>
+
+  <!-- COACH -->
+  <section id="view-coach" class="coach" role="tabpanel" aria-labelledby="tab-coach" hidden>
+    <h2>How can I help you today?</h2>
+    <p class="sub">Tell me what you are working on. I will guide you step by step, and you do the writing.</p>
+    <div class="chips" id="modes" role="group" aria-label="Type of work">
+      <button class="chip" aria-pressed="false">Speech</button>
+      <button class="chip" aria-pressed="false">Essay</button>
+      <button class="chip" aria-pressed="true">Homework</button>
+      <button class="chip" aria-pressed="false">Project</button>
+      <button class="chip" aria-pressed="false">Presentation</button>
+    </div>
+    <div class="meter">
+      <div class="meter-top"><span>Human contribution</span><b id="pct">0%</b></div>
+      <div class="track"><i id="pct-bar"></i></div>
+      <p>Your share of the words in this session. Write more yourself to raise it.</p>
+    </div>
+    <div class="thread" id="thread" aria-live="polite"></div>
+    <div class="composer">
+      <div class="chips" id="acts" style="justify-content:flex-start" role="group" aria-label="What kind of help">
+        <button class="chip act" data-act="Hint" aria-pressed="false">Hint</button>
+        <button class="chip act" data-act="Example" aria-pressed="false">Example</button>
+        <button class="chip act" data-act="Check My Work" aria-pressed="false">Check My Work</button>
+        <button class="chip act" data-act="Improve My Idea" aria-pressed="false">Improve My Idea</button>
+      </div>
+      <textarea id="c-in" placeholder="Tell me what you want to do..."></textarea>
+      <div id="c-err" class="err" role="alert" hidden></div>
+      <button class="send" id="c-send">Send</button>
+      <div class="row" style="justify-content:space-between">
+        <span></span>
+        <button class="link" id="c-reset">Start a new session</button>
+      </div>
+    </div>
+  </section>
+</main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+
+Part 3 of 5. Paste this right after Part 2, starting on the next line.
+
+function h(tag,attrs,...kids){const e=document.createElement(tag);for(const [k,v] of Object.entries(attrs||{})){if(v==null||v===false)continue;if(k==="class")e.className=v;else if(k==="text")e.textContent=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v===true?"":v)}for(const kid of kids.flat()){if(kid==null||kid===false)continue;e.append(kid.nodeType?kid:document.createTextNode(String(kid)))}return e}
+const flat=a=>a.flat(Infinity).filter(x=>x!=null&&x!==false);
+const fill=(el,...k)=>el.replaceChildren(...flat(k));
+const add=(el,...k)=>el.append(...flat(k));
+const words=s=>(String(s).trim().match(/\S+/g)||[]).length;
+
+/* ---------- storage ---------- */
+const KEY="studydrawer.v1";
+let state={xp:0,streak:0,last:"",initials:"AM",decks:[]};
+try{const s=JSON.parse(localStorage.getItem(KEY)||"null");if(s&&typeof s==="object")state=Object.assign(state,s)}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+
+const pad=n=>String(n).padStart(2,"0");
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};
+const dayDiff=(a,b)=>Math.round((new Date(b+"T00:00")-new Date(a+"T00:00"))/864e5);
+const streakNow=()=>state.last&&dayDiff(state.last,today())<=1?state.streak:0;
+const TITLES=["Newcomer","Reader","Student","Apprentice","Scholar","Analyst","Fellow","Master","Sage"];
+const PER=250;
+function paintStats(){
+  $("#st-streak").textContent=streakNow();
+  $("#st-xp").textContent=state.xp;
+  const lv=1+Math.floor(state.xp/PER);
+  $("#lv-title").textContent="Level "+lv+" "+TITLES[Math.min(lv-1,TITLES.length-1)];
+  $("#lv-sub").textContent=(PER-state.xp%PER)+" XP to Level "+(lv+1);
+  $("#lv-bar").style.width=(state.xp%PER)/PER*100+"%";
+}
+let toastT;
+function toast(t){const el=$("#toast");el.textContent=t;el.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove("show"),1600)}
+function award(n){
+  const t=today();
+  if(state.last!==t){const d=state.last?dayDiff(state.last,t):99;state.streak=d===1?state.streak+1:1;state.last=t}
+  state.xp+=n;save();paintStats();toast("+"+n+" XP");
+}
+const ini=$("#initials");ini.value=state.initials||"AM";
+ini.addEventListener("input",()=>{state.initials=ini.value.toUpperCase();save()});
+
+/*ENGINE-START*/
+const STOP=new Set("a about above after again against all also am an and any are as at be because been before being below between both but by can could did do does doing down during each few for from further had has have having he her here hers him his how i if in into is it its itself just me more most my no nor not now of off on once only or other our out over own same she should so some such than that the their theirs them then there these they this those through to too under until up very was we were what when where which while who whom why will with would you your yours one two may many much however also".split(" "));
+const tok=t=>(String(t).toLowerCase().match(/[a-z][a-z'-]{2,}/g)||[]).filter(w=>!STOP.has(w));
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const cap=s=>s?s.charAt(0).toUpperCase()+s.slice(1):s;
+const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+const wre=w=>new RegExp("\\b"+esc(w)+"\\b","i");
+function trim(s,n){s=String(s).trim();if(s.length<=n)return s;const c=s.slice(0,n);return c.slice(0,Math.max(c.lastIndexOf(" "),20))+"..."}
+function sents(t){
+  const out=[];
+  String(t).replace(/\r/g,"").split("\n").forEach(line=>{
+    const m=line.match(/[^.!?]+(?:[.!?]+["')\]]*|$)/g)||[];
+    m.forEach(x=>{x=x.replace(/\s+/g," ").trim().replace(/^[-*•]\s*/,"").replace(/^\d+[.)]\s+/,"");if(x.length>=25&&x.length<=340)out.push(x)});
+  });
+  if(!out.length){const x=String(t).replace(/\s+/g," ").trim();if(x)out.push(x)}
+  return out;
+}
+const DEF=/^(?:(?:An?|The)\s+)?([A-Za-z][A-Za-z -]{1,40}?)\s+(?:is|are|means|refers to|is called|are called|is known as|consists of|is defined as)\s+(.{10,})$/i;
+function defs(S){
+  const o=[];
+  S.forEach(s=>{
+    const m=s.match(DEF);if(!m)return;
+    const term=m[1].trim();
+    if(term.split(/\s+/).length>4)return;
+    if(/^\w+(?:ed|en)\s/i.test(m[2]))return;
+    if(/^(it|this|that|they|he|she|there|these|those|which|what|who|we|you|i)$/i.test(term.split(/\s+/)[0]))return;
+    o.push({term:cap(term),tail:m[2].replace(/[.!?]+$/,""),sentence:s});
+  });
+  return o;
+}
+function analyze(text){
+  const S=sents(text);const freq={};
+  tok(text).forEach(w=>{freq[w]=(freq[w]||0)+1});
+  const sc=S.map((s,i)=>{const ws=tok(s);if(!ws.length)return 0;let v=0;ws.forEach(w=>{v+=freq[w]||0});v=v/Math.pow(ws.length,0.6);if(i<2)v*=1.25;return v});
+  const D=defs(S);const seen=new Set();const T=[];
+  D.forEach(d=>{const k=d.term.toLowerCase();if(!seen.has(k)){seen.add(k);T.push({term:d.term,sentence:d.sentence,tail:d.tail})}});
+  const cand=Object.keys(freq).filter(w=>w.length>=4).sort((a,b)=>freq[b]*Math.sqrt(b.length)-freq[a]*Math.sqrt(a.length));
+  for(const w of cand){
+    if(T.length>=16)break;
+    if(seen.has(w)||T.some(t=>t.term.toLowerCase().includes(w)))continue;
+    if(freq[w]<2&&T.length>=6)continue;
+    const s=S.find(x=>wre(w).test(x));if(!s)continue;
+    seen.add(w);T.push({term:cap(w),sentence:s});
+  }
+  return {S,freq,sc,D,T};
+}
+function top(A,n){return A.sc.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]).slice(0,n).map(x=>x[1]).sort((a,b)=>a-b)}
+
+const Engine={
+  summary(text,userTitle){
+    const A=analyze(text);const idx=top(A,3);const pts=top(A,7);
+    const firstLine=String(text).trim().split("\n")[0].trim();
+    let title=userTitle||(firstLine.length<=60&&!/[.!?]$/.test(firstLine)&&A.S.length>1?firstLine:"");
+    if(!title){const t=A.T.slice(0,2).map(x=>x.term);title=t.length?"Notes on "+t.join(" and "):"My notes"}
+    let overview=idx.map(i=>A.S[i]).join(" ");
+    if(A.S.length<3)overview+=" (Tip: paste a few more sentences to get richer flashcards and quizzes.)";
+    const key=pts.map(i=>trim(A.S[i],200));
+    const take=pts.map(i=>A.S[i]).sort((a,b)=>a.length-b.length).find(s=>s.length>=30)||A.S[0];
+    return {title:trim(title,80),subject:A.T[0]?A.T[0].term:"",overview:trim(overview,700),key_points:key,takeaway:trim(take,200)};
+  },
+  story(text){
+    const A=analyze(text);const T=A.T.slice(0,4);
+    const hero=shuffle(["Mira","Tariq","Ana","Leo","Zoe","Ravi","Nina","Omar"])[0];
+    const topic=T[0]?T[0].term.toLowerCase():"this lesson";
+    const ord=["first","second","third","fourth"];
+    const P=[`One rainy afternoon, a curious student named ${hero} found an old wooden drawer at the back of the school library. Inside were ${Math.max(T.length,1)} glowing card${T.length===1?"":"s"}, and each one guarded a secret about ${topic}.`];
+    const dec=[{story:"The old drawer",concept:"Your notes"},{story:hero,concept:"You, the learner"}];
+    T.forEach((t,i)=>{
+      P.push(`The ${ord[i]} card belonged to ${t.term}. It rose into the air and spoke in a clear voice: "${trim(t.sentence,220)}" ${hero} repeated it twice, and the card glowed brighter.`);
+      dec.push({story:`The glowing card of ${t.term}`,concept:trim(t.tail?cap(t.tail):t.sentence,110)});
+    });
+    const names=T.map(t=>t.term);
+    const list=names.length?names.join(", ").replace(/, ([^,]*)$/," and $1"):"the lesson";
+    P.push(`${hero} thanked the cards, closed the drawer, and walked home. The next day, when the test asked about ${list}, ${hero} could picture each glowing card and remember exactly what it had said.`);
+    return {title:`${hero} and the Drawer of Secrets`,paragraphs:P,decoder:dec};
+  },
+  cards(text){
+    const A=analyze(text);const out=[];
+    A.D.slice(0,6).forEach(d=>out.push({front:"What is "+d.term+"?",back:trim(cap(d.tail)+".",220)}));
+    A.T.forEach(t=>{
+      if(out.length>=12)return;
+      if(A.D.some(d=>d.term===t.term))return;
+      const re=wre(t.term);if(!re.test(t.sentence))return;
+      out.push({front:"Fill in the blank: "+t.sentence.replace(re,"_____"),back:t.term+". Full sentence: "+trim(t.sentence,200)});
+    });
+    if(!out.length&&A.S[0])out.push({front:"Say the main idea in one sentence.",back:trim(A.S[0],220)});
+    return {cards:out.slice(0,12)};
+  },
+  quiz(text){
+    const A=analyze(text);const pool=A.T.map(t=>t.term);
+    const extra=[...new Set(tok(text).filter(w=>w.length>=5).map(cap))];
+    const Q=[];
+    const mk=(q,ans,why)=>{
+      let d=shuffle(pool.filter(p=>p!==ans));
+      if(d.length<3)d=d.concat(shuffle(extra.filter(p=>p!==ans&&!d.includes(p))));
+      d=d.slice(0,3);
+      const pad3=["None of these","Not mentioned","All of these"];
+      while(d.length<3)d.push(pad3[d.length]);
+      const opts=shuffle([ans,...d]);
+      Q.push({q,options:opts,answer:opts.indexOf(ans),why});
+    };
+    A.D.slice(0,4).forEach(d=>mk("Which term fits this description: "+trim(d.tail,140)+"?",d.term,d.sentence));
+    A.T.forEach(t=>{
+      if(Q.length>=8)return;
+      if(A.D.some(d=>d.term===t.term))return;
+      const re=wre(t.term);if(!re.test(t.sentence))return;
+      mk("Which word completes the sentence? "+t.sentence.replace(re,"_____"),t.term,"The sentence reads: "+t.sentence);
+    });
+    return {questions:shuffle(Q).slice(0,8)};
+  },
+  terms(text){
+    const A=analyze(text);
+    return {terms:A.T.slice(0,14).map(t=>({term:t.term,meaning:trim(t.tail?cap(t.tail)+".":t.sentence,200)}))};
+  },
+  tricks(text){
+    const A=analyze(text);const T=A.T.map(t=>t.term);const o=[];
+    if(T.length>=3){
+      const f=T.slice(0,6);
+      o.push({topic:f.join(", "),kind:"Acronym",trick:`Take the first letters: ${f.map(x=>x[0].toUpperCase()).join(" ")}. Make a silly sentence where each word starts with those letters, in this order. The sillier it is, the better you will remember it.`});
+      const chunks=[];for(let i=0;i<Math.min(T.length,9);i+=3)chunks.push(T.slice(i,i+3).join(" / "));
+      o.push({topic:"All key terms",kind:"Chunking",trick:`Memorise small groups instead of one long list: ${chunks.join("  |  ")}. Learn one group at a time.`});
+    }
+    for(let i=0;i+1<Math.min(T.length,6);i+=2)o.push({topic:T[i]+" and "+T[i+1],kind:"Picture link",trick:`Picture ${T[i]} crashing into ${T[i+1]} in a place you know well, like your classroom. A strange image sticks.`});
+    if(T[0])o.push({topic:T[0],kind:"Rhyme",trick:`Write a two-line rhyme that ends with the word "${T[0]}"`+(T[1]?` and the word "${T[1]}"`:"")+". Say it out loud three times."});
+    o.push({topic:"Any hard point",kind:"Teach it back",trick:"Explain the hardest idea to a friend or a mirror in 30 seconds without looking at your notes. Wherever you get stuck is what to review."});
+    o.push({topic:"The whole chapter",kind:"Spacing",trick:"Review today, tomorrow, in three days and in a week. Short, spaced practice beats one long night."});
+    return {tricks:o.slice(0,7)};
+  },
+  practice(text){
+    const A=analyze(text);const Q=[];
+    const CON=/\b(?:because|therefore|so that|which means|as a result)\b/i;
+    A.D.slice(0,2).forEach(d=>Q.push({q:"Define "+d.term+" in your own words.",marks:2,model_answer:d.sentence}));
+    A.S.filter(s=>CON.test(s)).slice(0,2).forEach(s=>{
+      const stem=s.split(CON)[0].trim().replace(/[,;:]$/,"");
+      if(stem.length>=15)Q.push({q:"Explain why, using the passage: "+trim(stem,120)+"?",marks:3,model_answer:s});
+    });
+    if(A.S.length)Q.push({q:"List the main points of the passage.",marks:5,model_answer:top(A,5).map(i=>"- "+trim(A.S[i],160)).join(" ")});
+    A.T.forEach(t=>{
+      if(Q.length>=5)return;
+      if(Q.some(q=>q.q.includes(t.term)))return;
+      Q.push({q:"Explain "+t.term+" and why it matters.",marks:3,model_answer:t.sentence});
+    });
+    return {questions:Q.slice(0,5)};
+  }
+};
+
+/* Coach: rule based, never writes the student's work */
+const HINT={
+  Essay:"Start with one sentence that answers the question. What is your main claim?",
+  Speech:"Begin with a line that would make the audience lean in. What surprised you most when you learned about this?",
+  Homework:"Underline what the question asks for, then list what you already know. Which fact connects the two?",
+  Project:"Write the goal in one sentence, then list three steps. Which step could you finish in ten minutes?",
+  Presentation:"Give each slide one point only. What is the single point of your first slide?"
+};
+const EXAMPLE={
+  Essay:'Example on a different topic: "School lunches should include more fruit, because fresh fruit gives students energy for afternoon classes. For example, ..." See the pattern? Claim, then reason, then proof.',
+  Speech:'Example on a different topic: "Hands up if you have ever lost a game by one point. I did, and it taught me more than any win." A question, a short story, then your point.',
+  Homework:'Example on a different topic. Question: "A bus travels 60 km in 2 hours. What is its speed?" Step 1, find what is asked (speed). Step 2, find the rule (distance divided by time). Step 3, substitute and check the units.',
+  Project:'Example on a different topic. Goal: "Grow a bean plant and measure it." Steps: 1) gather seeds and a cup, 2) plant and water daily, 3) measure and record every two days.',
+  Presentation:'Example on a different topic. Slide title: "Why bees matter". Text on the slide: "Bees feed us." Then you speak the details. The slide is the headline and you are the story.'
+};
+function writing(text){
+  const w=(String(text).match(/\S+/g)||[]);
+  const S=(String(text).match(/[^.!?]+[.!?]*/g)||[]).map(x=>x.trim()).filter(Boolean);
+  const freq={};tok(text).forEach(x=>{freq[x]=(freq[x]||0)+1});
+  const rep=Object.keys(freq).filter(x=>x.length>=4&&freq[x]>=4).sort((a,b)=>freq[b]-freq[a])[0];
+  const kw=Object.keys(freq).sort((a,b)=>freq[b]*b.length-freq[a]*a.length)[0]||"";
+  const long=S.slice().sort((a,b)=>b.split(/\s+/).length-a.split(/\s+/).length)[0];
+  const con=(String(text).match(/\b(because|for example|for instance|therefore|however|as a result)\b/i)||[])[1];
+  const openers={};S.forEach(s=>{const f=s.split(/\s+/)[0].toLowerCase();openers[f]=(openers[f]||0)+1});
+  const sameOpen=Object.keys(openers).find(k=>openers[k]>=3);
+  return {words:w.length,S,rep,repN:rep?freq[rep]:0,kw,long,con,sameOpen};
+}
+function check(A){
+  if(A.words<12)return "Paste what you have written so far, even if it is rough, and I will check it.";
+  const good=A.con?`What works: you used "${A.con}" to connect your ideas.`:A.words>=40?"What works: you have a solid amount down to work with.":"What works: you have started, which is the hardest part.";
+  const p=[];
+  if(A.long&&A.long.split(/\s+/).length>28)p.push(`This sentence is long: "${A.long.split(/\s+/).slice(0,10).join(" ")}..." Try splitting it into two.`);
+  if(A.rep)p.push(`You use "${A.rep}" ${A.repN} times. Find a different way to say some of them.`);
+  if(!A.con)p.push('I do not see a reason or an example. After your main point, add "because" or "for example" and finish the thought.');
+
+Part 4 of 5. Paste this right after Part 3, starting on the next line.
+
+  if(A.sameOpen)p.push(`Several sentences start with "${cap(A.sameOpen)}". Change how a couple of them begin.`);
+  if(A.words<30)p.push("It is quite short. Add one more idea with a detail.");
+  const list=p.slice(0,3);
+  return good+" "+(list.length?"Things to improve: "+list.map((x,i)=>`${i+1}) ${x}`).join(" "):"I could not spot big problems. Read it out loud and mark anywhere you run out of breath.");
+}
+const Coach={
+  reply(mode,act,text){
+    const A=writing(text);const kw=A.kw?`"${A.kw}"`:"your topic";let body,step;
+    if(act==="Hint"){body=HINT[mode]+(A.kw?` Keep ${kw} in mind as you answer.`:"");step="write your answer in one or two sentences and send it."}
+    else if(act==="Example"){body=EXAMPLE[mode]+` Now try it yourself with ${kw}.`;step="write your own version and send it for feedback."}
+    else if(act==="Check My Work"){body=check(A);step="fix the first problem only, then paste it again."}
+    else if(act==="Improve My Idea"){body=`Think about two questions. Who is this for, and what should they feel or do after hearing about ${kw}? And what is one thing about ${kw} that most people miss? Two directions you could take: zoom in on one small part of ${kw} and go deep, or connect ${kw} to something from your own life.`;step="write two sentences that answer the first question, then send them."}
+    else if(A.words<8){body="Tell me a little more. What is the task, who is it for, and what have you tried so far? The more you write, the better I can coach you.";step="write what you have tried, even if it is messy."}
+    else{body=HINT[mode]+" I will not write it for you, but I will help you build it.";step="write one or two sentences and send them."}
+    return body+"\n\nNext step: "+step;
+  }
+};
+/*ENGINE-END*/
+
+function showErr(el,t){el.textContent=t;el.hidden=!t}
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+let tessP=null;
+function loadTess(){
+  if(window.Tesseract)return Promise.resolve();
+  if(tessP)return tessP;
+  tessP=new Promise((res,rej)=>{
+    const sc=document.createElement("script");
+    sc.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+    sc.onload=res;sc.onerror=()=>{tessP=null;rej(new Error("load"))};
+    document.head.append(sc);
+  });
+  return tessP;
+}
+async function ocr(list,onProg){
+  await loadTess();
+  const out=[];
+  for(let i=0;i<list.length;i++){
+    onProg("Reading page "+(i+1)+" of "+list.length+"...");
+    const r=await window.Tesseract.recognize(list[i].file,"eng");
+    out.push(r.data.text);
+  }
+  return out.join("\n\n");
+}
+const limits={images:{maxCount:8}};
+function paintAvail(){$("#photo-note").textContent="Up to "+limits.images.maxCount+" photos per deck. Photos are read on your device. The first scan downloads the text reader, so it needs an internet connection."}
+paintAvail();
+
+/* ---------- views ---------- */
+const views={drawer:$("#view-drawer"),coach:$("#view-coach")};
+function setView(v){
+  if(!views[v])v="drawer";
+  for(const k in views){views[k].hidden=k!==v;$("#tab-"+k).setAttribute("aria-selected",String(k===v))}
+  document.body.classList.toggle("on-coach",v==="coach");
+  try{if(location.hash!=="#"+v)history.replaceState(null,"","#"+v)}catch(e){}
+}
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
+window.addEventListener("hashchange",()=>setView(location.hash.slice(1)));
+
+/* ---------- home ---------- */
+function fmtDate(t){try{return new Date(t).toLocaleDateString(undefined,{day:"numeric",month:"short"})}catch(e){return""}}
+function paintDecks(){
+  const box=$("#decks");fill(box,);
+  if(!state.decks.length){box.append(h("p",{class:"empty",text:"Empty drawer. Generate a deck to file it here."}));return}
+  for(const d of state.decks){
+    const n=Object.keys(d.sections||{}).length;
+    box.append(h("button",{class:"deck",onclick:()=>openDeck(d.id)},
+      h("h3",{text:d.title}),
+      h("span",{class:"mono meta",text:[d.subject,fmtDate(d.created),n+" of 7 sections"].filter(Boolean).join("  /  ")}),
+      h("span",{class:"go",text:"Open"})));
+  }
+}
+
+let mode="type",files=[];
+function setMode(m){
+  mode=m;$("#m-type").setAttribute("aria-pressed",String(m==="type"));$("#m-photo").setAttribute("aria-pressed",String(m==="photo"));
+  $("#p-type").hidden=m!=="type";$("#p-photo").hidden=m!=="photo";
+}
+$("#m-type").onclick=()=>setMode("type");$("#m-photo").onclick=()=>setMode("photo");
+$("#b-cam").onclick=()=>$("#f-cam").click();$("#b-file").onclick=()=>$("#f-file").click();
+function addFiles(list){
+  const max=(limits&&limits.images&&limits.images.maxCount)||5;
+  for(const f of list){if(files.length>=max)break;files.push({file:f,url:URL.createObjectURL(f)})}
+  paintThumbs();
+}
+$("#f-cam").onchange=e=>{addFiles(e.target.files);e.target.value=""};
+$("#f-file").onchange=e=>{addFiles(e.target.files);e.target.value=""};
+function paintThumbs(){
+  const t=$("#thumbs");t.replaceChildren();
+  files.forEach((f,i)=>t.append(h("div",{class:"thumb"},h("img",{src:f.url,alt:"Page "+(i+1)}),h("button",{type:"button","aria-label":"Remove page "+(i+1),onclick:()=>{URL.revokeObjectURL(f.url);files.splice(i,1);paintThumbs()}},"×"))));
+}
+
+let ctl=null;
+
+$("#stamp").onclick=async()=>{
+  const err=$("#stamp-err");showErr(err,"");
+  let text=$("#text-in").value.trim();
+  const typed=mode==="type";
+  if(typed&&!text){showErr(err,"Type or paste something first. A few sentences work best.");return}
+  if(!typed&&!files.length){showErr(err,"Add at least one photo of your chapter or notes.");return}
+  const st=$("#stamp-status");st.hidden=false;st.textContent=typed?"Building your deck...":"Loading the text reader...";
+  $("#stamp").disabled=true;
+  try{
+    if(!typed){
+      text=(await ocr(files,t=>{st.textContent=t})).trim();
+      if(text.length<20)throw {code:"empty"};
+    }
+    st.textContent="Building your deck...";
+    await delay(200);
+    const r=Engine.summary(text,$("#title-in").value.trim());
+    const deck={id:"d"+Date.now(),title:r.title,subject:r.subject,created:Date.now(),transcript:text,
+      sections:{summary:{overview:r.overview,key_points:r.key_points,takeaway:r.takeaway}},known:{},quiz:{}};
+    state.decks.unshift(deck);save();award(20);
+    $("#text-in").value="";$("#title-in").value="";files.forEach(f=>URL.revokeObjectURL(f.url));files=[];paintThumbs();
+    paintDecks();openDeck(deck.id);
+  }catch(e){
+    showErr(err,e&&e.code==="empty"?"I could not read any text from the photos. Try a sharper, well lit, flat photo, or type the text instead.":typed?"Something went wrong building the deck. Try again.":"The text reader could not load. Check your internet connection and try again, or type the text instead.");
+  }finally{$("#stamp").disabled=false;st.hidden=true}
+};
+
+/* ---------- deck view ---------- */
+const SECS=[["summary","Summary"],["story","Story"],["cards","Flashcards"],["quiz","Quiz"],["terms","Key Terms"],["tricks","Memory Tricks"],["practice","Written Practice"]];
+let curDeck=null,curSec="summary",secCtl=null;
+function openDeck(id){
+  curDeck=state.decks.find(d=>d.id===id);if(!curDeck)return;
+  $("#home").hidden=true;const v=$("#deckview");v.hidden=false;v.replaceChildren();
+  let confirmDel=false;
+  const del=h("button",{class:"btn quiet",type:"button",onclick:()=>{
+    if(!confirmDel){confirmDel=true;del.textContent="Confirm delete";return}
+    state.decks=state.decks.filter(d=>d.id!==curDeck.id);save();closeDeck()}},"Delete deck");
+  v.append(
+    h("div",{class:"deck-top"},h("button",{class:"btn",type:"button",onclick:closeDeck},"Back to drawer"),del),
+    h("h2",{class:"deck-title",text:curDeck.title}),
+    h("span",{class:"mono",style:"color:var(--ink-2)",text:curDeck.subject||"Deck"}),
+    h("div",{class:"sections",role:"tablist",id:"secs"}),
+    h("div",{class:"panel",id:"panel",role:"tabpanel"}));
+  const bar=$("#secs");
+  for(const [k,l] of SECS)bar.append(h("button",{class:"sec",role:"tab","data-k":k,onclick:()=>showSec(k)},l));
+  showSec("summary");window.scrollTo({top:0});
+}
+function closeDeck(){if(secCtl)secCtl.abort();curDeck=null;$("#deckview").hidden=true;$("#home").hidden=false;paintDecks();paintStats()}
+
+function showSec(k){
+  if(secCtl)secCtl.abort();
+  curSec=k;
+  document.querySelectorAll(".sec").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.k===k)));
+  const panel=$("#panel");panel.replaceChildren();
+  const data=curDeck.sections[k];
+  if(data){renderSec(k,panel,data);return}
+  generate(k,panel);
+}
+const NEED={story:"paragraphs",cards:"cards",quiz:"questions",terms:"terms",tricks:"tricks",practice:"questions"};
+async function generate(k,panel){
+  const label=SECS.find(x=>x[0]===k)[1];
+  const deck=curDeck;
+  panel.replaceChildren(h("div",{class:"loading"},h("p",{class:"mono",text:"Preparing "+label}),h("div",{class:"bar"},h("i"))));
+  await delay(250);
+  if(curDeck!==deck||curSec!==k)return;
+  try{
+    const r=Engine[k](deck.transcript);
+    panel.replaceChildren();
+    if(!r[NEED[k]]||!r[NEED[k]].length){
+      panel.append(h("p",{text:"There is not enough text to build this section yet. Go back and add a longer passage, a few sentences or more."}));
+      return;
+    }
+    deck.sections[k]=r;save();
+    renderSec(k,panel,r);
+  }catch(e){
+    panel.replaceChildren(h("div",{class:"err",role:"alert",text:"Something went wrong building this section."}),
+      h("div",{class:"regen"},h("button",{class:"btn",type:"button",onclick:()=>generate(k,panel)},"Try again")));
+  }
+}
+function regenBtn(k,panel){
+  return h("div",{class:"regen"},h("button",{class:"btn quiet",type:"button",onclick:()=>{delete curDeck.sections[k];if(k==="cards")curDeck.known={};if(k==="quiz")curDeck.quiz={};save();generate(k,panel)}},"Regenerate this section"));
+}
+function renderSec(k,panel,d){
+  ({summary:rSummary,story:rStory,cards:rCards,quiz:rQuiz,terms:rTerms,tricks:rTricks,practice:rPractice})[k](panel,d);
+  if(k!=="summary")panel.append(regenBtn(k,panel));
+}
+function rSummary(p,d){
+  add(p,h("p",{class:"lede",text:d.overview}),
+    h("h3",{text:"Key points"}),
+    h("ul",{class:"points"},d.key_points.map(t=>h("li",{text:t}))),
+    d.takeaway&&h("div",{class:"callout"},h("span",{class:"mono",text:"Remember this"}),h("p",{text:d.takeaway})));
+}
+function rStory(p,d){
+  add(p,h("div",{class:"story"},h("h3",{text:d.title||"The story"}),d.paragraphs.map(t=>h("p",{text:t}))));
+  if(Array.isArray(d.decoder)&&d.decoder.length){
+    add(p,h("div",{class:"decoder"},h("span",{class:"mono",style:"color:var(--ink-2)",text:"Story decoder"}),
+      d.decoder.map(x=>h("div",{class:"pair"},h("span",{text:x.story}),h("span",{text:x.concept})))));
+  }
+}
+function rTerms(p,d){add(p,h("dl",{class:"terms"},d.terms.map(t=>h("div",{},h("dt",{text:t.term}),h("dd",{text:t.meaning})))))}
+function rTricks(p,d){add(p,d.tricks.map(t=>h("div",{class:"trick"},h("span",{class:"mono",text:[t.kind,t.topic].filter(Boolean).join("  /  ")}),h("p",{text:t.trick}))))}
+function rPractice(p,d){
+  d.questions.forEach((q,i)=>{
+    const ta=h("textarea",{id:"pa"+i,"aria-label":"Your answer to question "+(i+1),placeholder:"Write your answer first, then compare."});
+    const model=h("div",{class:"model",hidden:true},h("span",{class:"mono",style:"color:var(--ink-2)",text:"Model answer"}),h("p",{style:"margin:6px 0 0",text:q.model_answer}));
+    const b=h("button",{class:"btn",type:"button",onclick:()=>{model.hidden=!model.hidden;b.textContent=model.hidden?"Show model answer":"Hide model answer";if(!curDeck.pr)curDeck.pr={};
+      if(!model.hidden&&ta.value.trim().length>20&&!curDeck.pr[i]){curDeck.pr[i]=1;save();award(8)}}},"Show model answer");
+    add(p,h("div",{class:"pq"},h("span",{class:"mono",style:"color:var(--ink-2)",text:"Question "+(i+1)+(q.marks?"  /  "+q.marks+" marks":"")}),h("p",{style:"font-weight:600;margin-top:6px",text:q.q}),ta,b,model));
+  });
+}
+function rCards(p,d){
+  const cards=d.cards;let i=0,flip=false;
+  const box=h("div");add(p,box);
+  function draw(){
+    const c=cards[i],known=!!curDeck.known[i];
+    const nKnown=Object.keys(curDeck.known).length;
+    fill(box,
+      h("div",{class:"fc-count mono",text:"Card "+(i+1)+" of "+cards.length+"  /  "+nKnown+" known"}),
+      h("div",{class:"fc"},h("button",{class:"fc-face"+(flip?" back":""),type:"button","aria-label":flip?"Showing answer. Press to see the question.":"Showing question. Press to reveal the answer.",onclick:()=>{flip=!flip;draw()}},
+        h("div",{},h("span",{class:"mono",text:flip?"Answer":"Question"}),h("span",{class:"txt",text:flip?c.back:c.front})))),
+      known&&h("div",{class:"fc-known mono",text:"Marked as known"}),
+      h("div",{class:"row",style:"margin-top:12px"},
+        h("button",{class:"btn",type:"button",disabled:i===0,onclick:()=>{i--;flip=false;draw()}},"Previous"),
+        h("button",{class:"btn",type:"button",onclick:()=>{flip=!flip;draw()}},flip?"Show question":"Flip"),
+        h("button",{class:"btn",type:"button",onclick:()=>{if(!curDeck.known[i]){curDeck.known[i]=1;save();award(5)}if(i<cards.length-1)i++;flip=false;draw()}},"Got it"),
+        h("button",{class:"btn",type:"button",disabled:i===cards.length-1,onclick:()=>{i++;flip=false;draw()}},"Next")));
+  }
+  draw();
+}
+function rQuiz(p,d){
+  const qs=d.questions;let i=0,score=0,picked=null;const box=h("div");add(p,box);
+  function draw(){
+    if(i>=qs.length){
+      if(!curDeck.qDone){curDeck.qDone=1;save();award(25)}
+      fill(box,h("span",{class:"mono",style:"color:var(--ink-2)",text:"Quiz complete"}),
+        h("div",{class:"score",text:score+" / "+qs.length}),
+        h("p",{text:score===qs.length?"Perfect round.":score>=qs.length*0.7?"Strong result. Review the questions you missed.":"Worth another pass through the flashcards before you retry."}),
+        h("button",{class:"btn",type:"button",onclick:()=>{i=0;score=0;picked=null;draw()}},"Retake quiz"));return}
+    const q=qs[i];
+    const opts=h("div",{class:"opts",role:"group","aria-label":"Answer options"},q.options.map((o,j)=>{
+      const cls=picked===null?"":j===q.answer?" right":j===picked?" wrong":"";
+      return h("button",{class:"opt"+cls,type:"button",disabled:picked!==null,onclick:()=>{
+        picked=j;if(j===q.answer){score++;if(!curDeck.quiz[i]){curDeck.quiz[i]=1;save();award(10)}}draw()}},
+        h("b",{text:"ABCD"[j]}),h("span",{text:o}));
+    }));
+    fill(box,h("span",{class:"mono",style:"color:var(--ink-2)",text:"Question "+(i+1)+" of "+qs.length+"  /  Score "+score}),
+      h("div",{class:"q-text",text:q.q}),opts,
+      picked!==null&&h("div",{class:"why"},h("b",{text:picked===q.answer?"Correct. ":"Not quite. "}),q.why),
+      picked!==null&&h("div",{class:"row",style:"margin-top:16px"},h("button",{class:"btn",type:"button",onclick:()=>{i++;picked=null;draw()}},i===qs.length-1?"See score":"Next question")));
+  }
+  draw();
+}
+
+/* ---------- coach ---------- */
+const coach={mode:"Homework",act:null,turns:[],u:0,a:0,busy:false,ctl:null};
+const thread=$("#thread"),cin=$("#c-in");
+document.querySelectorAll("#modes .chip").forEach(b=>b.addEventListener("click",()=>{
+
+Part 5 of 5 (the last). Paste this right after Part 4. It ends the file.
+
+  document.querySelectorAll("#modes .chip").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));coach.mode=b.textContent}));
+const PH={"Hint":"Say where you are stuck. I will give you one small nudge.","Example":"Say what you are trying to do. I will show a similar example on another topic.","Check My Work":"Paste what you have written so far.","Improve My Idea":"Describe your idea in your own words."};
+document.querySelectorAll("#acts .chip").forEach(b=>b.addEventListener("click",()=>{
+  const on=b.getAttribute("aria-pressed")!=="true";
+  document.querySelectorAll("#acts .chip").forEach(x=>x.setAttribute("aria-pressed","false"));
+  b.setAttribute("aria-pressed",String(on));coach.act=on?b.dataset.act:null;
+  cin.placeholder=on?PH[coach.act]:"Tell me what you want to do...";cin.focus()}));
+function paintPct(){
+  const t=coach.u+coach.a,p=t?Math.round(coach.u/t*100):0;
+  $("#pct").textContent=p+"%";$("#pct-bar").style.width=p+"%";
+}
+function bubble(cls,who,text){const m=h("div",{class:"msg "+cls},h("span",{class:"who",text:who}),h("span",{class:"body",text:text}));thread.append(m);m.scrollIntoView({block:"nearest",behavior:"smooth"});return m}
+
+$("#c-send").onclick=async()=>{
+  if(coach.busy)return;
+  const text=cin.value.trim(),err=$("#c-err");showErr(err,"");
+  if(!text){showErr(err,"Write a few words about what you are working on first.");return}
+  const act=coach.act;
+  coach.u+=words(text);paintPct();
+  bubble("me","You"+(act?"  /  "+act:""),text);
+  cin.value="";
+  document.querySelectorAll("#acts .chip").forEach(x=>x.setAttribute("aria-pressed","false"));coach.act=null;cin.placeholder="Tell me what you want to do...";
+  const out=bubble("ai","Coach","Thinking...");
+  coach.busy=true;$("#c-send").disabled=true;
+  await delay(500);
+  const reply=Coach.reply(coach.mode,act,text);
+  out.querySelector(".body").textContent=reply;
+  coach.turns.push({role:"user",content:text},{role:"assistant",content:reply});
+  coach.a+=words(reply);paintPct();
+  coach.busy=false;$("#c-send").disabled=false;
+};
+$("#c-reset").onclick=()=>{if(coach.ctl)coach.ctl.abort();coach.turns=[];coach.u=0;coach.a=0;thread.replaceChildren();paintPct();showErr($("#c-err"),"")};
+
+/* ---------- landing + login ---------- */
+const appEl=$("#app"),landing=$("#landing");
+function enterApp(){landing.hidden=true;appEl.hidden=false;window.scrollTo({top:0})}
+function showLanding(){appEl.hidden=true;landing.hidden=false;try{history.replaceState(null,"",location.pathname)}catch(e){}window.scrollTo({top:0})}
+const wipe=$("#wipe");let busy=false;
+function swapIn(){landing.hidden=true;appEl.hidden=false;window.scrollTo({top:0});appEl.classList.remove("app-rise");void appEl.offsetWidth;appEl.classList.add("app-rise")}
+function startApp(){
+  if(busy)return;
+  if(window.matchMedia("(prefers-reduced-motion:reduce)").matches){enterApp();return}
+  busy=true;wipe.classList.add("in");
+  setTimeout(swapIn,900);
+  setTimeout(()=>{wipe.classList.remove("in");wipe.classList.add("out")},1050);
+  setTimeout(()=>{wipe.classList.remove("out");busy=false},1750);
+}
+$("#start").onclick=startApp;$("#start2").onclick=startApp;
+$("#see").onclick=()=>$("#rows").scrollIntoView({behavior:"smooth",block:"center"});
+const IC={
+ summary:'<path d="M4 6h16M4 12h16M4 18h10"/>',
+ story:'<path d="M12 6c-2-2-5-2-8-1v13c3-1 6-1 8 1 2-2 5-2 8-1V5c-3-1-6-1-8 1z"/><path d="M12 6v13"/>',
+ cards:'<rect x="3" y="8" width="14" height="11" rx="2"/><path d="M7 8V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/>',
+ quiz:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7"/><path d="M12 17h.01"/>',
+ terms:'<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/>',
+ spark:'<path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z"/>',
+ pencil:'<path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/>',
+ coach:'<path d="M4 5h16v11H9l-5 4z"/>',
+ flame:'<path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 2 1 2 0-3 1-5 2-8z"/>',
+ star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+ camera:'<path d="M4 8h3l2-3h6l2 3h3v12H4z"/><circle cx="12" cy="13" r="3.5"/>',
+ trophy:'<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 21h8"/>'
+};
+const TOOLS=[["Summary","summary","#1B2A3B"],["Story","story","#BE4128"],["Flashcards","cards","#5578E0"],["Quiz","quiz","#2F7D4F"],["Key Terms","terms","#7B5CD6"],["Memory Tricks","spark","#D98A1F"],["Written Practice","pencil","#C2477D"],["Coach","coach","#3FB6C9"],["Streaks","flame","#E0572B"],["XP","star","#B59B00"],["Photo Scan","camera","#4B5B6C"],["Levels","trophy","#2F7D4F"]];
+const badge=(k,c)=>'<span class="badge" style="background:'+c+'"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+IC[k]+'</svg></span>';
+const item=t=>'<span class="item">'+badge(t[1],t[2])+t[0]+'</span>';
+(function(){
+  const rows=$("#rows");
+  [[0,""],[4,"rev"],[8,"slow"]].forEach(([off,cls])=>{
+    const set=TOOLS.slice(off).concat(TOOLS.slice(0,off)).map(item).join("");
+    rows.insertAdjacentHTML("beforeend",'<div class="row-track '+cls+'">'+set+set+'</div>');
+  });
+  $("#mini").innerHTML=[0,1,2,3].map(i=>badge(TOOLS[i+1][1],TOOLS[i+1][2])).join("");
+  $("#stack").innerHTML=[2,3,1].map(i=>badge(TOOLS[i][1],TOOLS[i][2])).join("")+'<span class="more">12</span>';
+  const names=["Summary","Story","Flashcards","Quiz","Key Terms","Practice"];
+  const pills=$("#pills");names.forEach((n,i)=>pills.append(h("span",{class:"pill"+(i===2?" on":""),text:n})));
+  let at=2;setInterval(()=>{const ps=pills.children;ps[at].classList.remove("on");at=(at+1)%ps.length;ps[at].classList.add("on")},1800);
+})();
+document.querySelector(".brand h1").onclick=showLanding;
+const TICK=["Goat Apps","Study smarter, not harder","Notes in, flashcards out","Beat the exam, not the clock","Your drawer, your pace","Flip. File. Learn.","Streaks start today","Free to use"];
+(function(){const t=$("#ticker");for(let n=0;n<2;n++)TICK.concat(TICK).forEach(x=>t.append(h("span",{text:x+"  ✦"})))})();
+const modal=$("#login-modal"),lb=$("#login-btn");
+function initialsOf(n){const w=n.trim().split(/\s+/);return ((w[0]||"")[0]||"").concat(w.length>1?w[w.length-1][0]:(w[0]||"")[1]||"").toUpperCase()}
+function paintLogin(){lb.textContent=state.user&&state.user.name?"Log out ("+state.user.name.split(" ")[0]+")":"Log in"}
+lb.onclick=()=>{
+  if(state.user&&state.user.name){delete state.user;save();paintLogin();return}
+  modal.hidden=false;$("#lg-name").focus();
+};
+$("#lg-cancel").onclick=()=>{modal.hidden=true};
+modal.addEventListener("click",e=>{if(e.target===modal)modal.hidden=true});
+$("#login-form").onsubmit=e=>{
+  e.preventDefault();
+  const name=$("#lg-name").value.trim();if(!name)return;
+  state.user={name:name,email:$("#lg-email").value.trim()};
+  state.initials=initialsOf(name);ini.value=state.initials;save();
+  paintLogin();modal.hidden=true;toast("Welcome, "+name.split(" ")[0]);
+};
+paintLogin();
+if(/^#(drawer|coach)$/.test(location.hash))enterApp();
+
+/* ---------- boot ---------- */
+paintStats();paintDecks();paintPct();setMode("type");
+setView(location.hash.slice(1));
+})();
+</script>
+
+</body>
+</html>
